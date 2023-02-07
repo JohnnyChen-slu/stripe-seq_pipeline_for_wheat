@@ -1,0 +1,59 @@
+import argparse
+import gzip
+from Bio import SeqIO
+
+def fastq_parser(input_file):
+    with gzip.open(input_file, 'rt') as f:
+        for record in SeqIO.parse(f, 'fastq'):
+            yield record
+
+def main():
+    parser = argparse.ArgumentParser(description='Process some fastq files.')
+    parser.add_argument('input_file_r1', type=str, help='input file R1')
+    parser.add_argument('input_file_r2', type=str, help='input file R2')
+    args = parser.parse_args()
+
+    good_reads_r1_file = args.input_file_r1.split('.fastq.gz')[0] + '_good_reads.fastq.gz'
+    good_reads_r2_file = args.input_file_r2.split('.fastq.gz')[0] + '_good_reads.fastq.gz'
+    bad_umi_r1_file = args.input_file_r1.split('.fastq.gz')[0] + '_bad_umi.fastq.gz'
+    bad_umi_r2_file = args.input_file_r2.split('.fastq.gz')[0] + '_bad_umi.fastq.gz'
+    bad_reads_r1_file = args.input_file_r1.split('.fastq.gz')[0] + '_bad_reads.fastq.gz'
+    bad_reads_r2_file = args.input_file_r2.split('.fastq.gz')[0] + '_bad_reads.fastq.gz'
+
+    good_reads = 0
+    bad_reads = 0
+    bad_umi = 0
+
+    print("Processing the %s file..." % args.input_file_r1.split('.fastq.gz')[0])
+
+    with gzip.open(good_reads_r1_file, 'wt') as good_r1, \
+         gzip.open(good_reads_r2_file, 'wt') as good_r2, \
+         gzip.open(bad_umi_r1_file, 'wt') as bad_umi_r1, \
+         gzip.open(bad_umi_r2_file, 'wt') as bad_umi_r2, \
+         gzip.open(bad_reads_r1_file, 'wt') as bad_r1, \
+         gzip.open(bad_reads_r2_file, 'wt') as bad_r2:
+        
+        r1_parser = fastq_parser(args.input_file_r1)
+        r2_parser = fastq_parser(args.input_file_r2)
+
+        for r1, r2 in zip(r1_parser, r2_parser):
+            if 'TATAGGG' in str(r1.seq)[:20]:
+                if str(r1.seq)[8:15] == 'TATAGGG':
+                    good_reads += 1
+                    SeqIO.write(r1, good_r1, 'fastq')
+                    SeqIO.write(r2, good_r2, 'fastq')
+                else:
+                    bad_umi += 1
+                    SeqIO.write(r1, bad_umi_r1, 'fastq')
+                    SeqIO.write(r2, bad_umi_r2, 'fastq')
+            else:
+                bad_reads += 1
+                SeqIO.write(r1, bad_r1, 'fastq')
+                SeqIO.write(r2, bad_r2, 'fastq')
+        print('finished!')
+        print(f"Total good reads: {good_reads}")
+        print(f"Total bad reads: {bad_reads}")
+        print(f"Total bad UMIs: {bad_umi}")
+
+if __name__ == '__main__':
+    main()
